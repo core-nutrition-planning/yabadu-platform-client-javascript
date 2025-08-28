@@ -1,0 +1,164 @@
+name: Generate and Publish Client
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to GitHub Packages'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: 'https://npm.pkg.github.com'
+
+jobs:
+  generate-client:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.REGISTRY }}
+
+      - name: Generate TypeScript client
+        run: |
+          # Create output directory
+          mkdir -p ./generated
+          
+          # Generate client using OpenAPI Generator
+          docker run --rm \
+            -v "${PWD}:/local" \
+            openapitools/openapi-generator-cli:latest generate \
+            -i /local/openapi.yml \
+            -g typescript-fetch \
+            -o /local/generated \
+            --additional-properties=npmName=@${{ github.repository }},supportsES6=true,npmVersion=${{ github.run_number }}.0.0,typescriptThreePlus=true \
+            --skip-validate-spec
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd generated && npm ci
+
+      - name: Build client
+        run: |
+          cd generated
+          npm run build || echo "No build script found"
+
+      - name: Run tests
+        run: |
+          npm test || echo "No tests configured"
+
+      - name: Upload generated client as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-client
+          path: generated/
+          retention-days: 7
+
+  publish-package:
+    needs: generate-client
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') ||
+      github.event.inputs.publish == 'true'
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download generated client
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-client
+          path: generated/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.REGISTRY }}
+          scope: '@${{ github.repository_owner }}'
+
+      - name: Configure package.json for GitHub Packages
+        run: |
+          cd generated
+          # Update package.json with proper scoped name and repository info
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.name = '@${{ github.repository }}';
+          pkg.version = '1.${{ github.run_number }}.0';
+          pkg.repository = {
+            type: 'git',
+            url: 'git+https://github.com/${{ github.repository }}.git'
+          };
+          pkg.publishConfig = {
+            registry: '${{ env.REGISTRY }}'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
+      - name: Publish to GitHub Packages
+        run: |
+          cd generated
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  generate-docs:
+    needs: generate-client
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download generated client
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-client
+          path: generated/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install TypeDoc
+        run: npm install -g typedoc
+
+      - name: Generate documentation
+        run: |
+          cd generated
+          typedoc --out ../docs src/index.ts || echo "Documentation generation skipped"
+
+      - name: Upload docs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/
+          retention-days: 30

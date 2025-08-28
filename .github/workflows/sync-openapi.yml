@@ -1,0 +1,88 @@
+name: Sync OpenAPI Specification
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: 'URL to OpenAPI specification'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  sync-openapi:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download OpenAPI specification
+        run: |
+          # Use provided URL or default to your API endpoint
+          OPENAPI_URL="${{ github.event.inputs.source_url }}"
+          if [ -z "$OPENAPI_URL" ]; then
+            # Default URL - update this to your actual API endpoint
+            OPENAPI_URL="https://api.yabadu.com/openapi"
+          fi
+          
+          # Download the OpenAPI spec
+          curl -o openapi-new.yml "$OPENAPI_URL" || exit 1
+          
+          # Check if file was downloaded successfully
+          if [ ! -s openapi-new.yml ]; then
+            echo "Failed to download OpenAPI specification"
+            exit 1
+          fi
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if [ -f openapi.yml ]; then
+            if cmp -s openapi.yml openapi-new.yml; then
+              echo "No changes detected in OpenAPI specification"
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "Changes detected in OpenAPI specification"
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              mv openapi-new.yml openapi.yml
+            fi
+          else
+            echo "OpenAPI specification not found, adding new file"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            mv openapi-new.yml openapi.yml
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update OpenAPI specification'
+          title: 'Update OpenAPI Specification'
+          body: |
+            ## OpenAPI Specification Update
+            
+            This PR updates the OpenAPI specification with the latest changes from the API.
+            
+            ### Changes
+            - Updated `openapi.yml` with latest API specification
+            - Client will be regenerated upon merge
+            
+            ### Next Steps
+            1. Review the changes to ensure they are expected
+            2. Merge this PR to trigger client regeneration
+            3. A new version will be published to GitHub Packages automatically
+          branch: update-openapi-spec
+          delete-branch: true
+          labels: |
+            automated
+            openapi
+            dependencies

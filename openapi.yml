@@ -1,0 +1,1278 @@
+openapi: 3.1.0
+info:
+  title: Yabadu Platform API
+  description: |
+    The Yabadu Platform API provides comprehensive nutrition planning and athletic event management services.
+
+    ## Authentication
+    Most endpoints require Bearer token authentication. Obtain tokens via OAuth 2.0 flows.
+
+    ## Content Types
+    - Primary: `application/vnd.yabaduplatform+json`
+    - Alternative formats: CSV (`application/vnd.yabaduplatform+csv`), PDF (`application/vnd.yabaduplatform+pdf`)
+    - Search formats: Table (`application/vnd.yabaduplatform.search.table+json`), Typeahead (`application/vnd.yabaduplatform.search.typeahead+json`)
+
+    ## Hypermedia
+    All responses include HATEOAS links for API discoverability.
+
+    ## Pagination
+    Collection endpoints support pagination via `page` and `per_page` query parameters.
+    Pagination metadata is returned in HTTP headers:
+    - `X-Pagination-Page`: Current page
+    - `X-Pagination-PerPage`: Items per page
+    - `X-Pagination-Total`: Total items
+    - `X-Pagination-MaximumPerPage`: Maximum allowed per page (250)
+
+    ## Oauth info
+    Client ID: be0a98da60f49111931b708178da9500d3c03f5227c81d8ab347d78ab5db
+    Client Secret: 20ac1a3adb33a9adc027b4f42218eb34386806fc7e0fe67462bcb193ddad
+    Username: kyle@fkbalderson.com
+    Password: tJyBM9LfxUBB4MgjgZiw
+  version: 1.0.0
+  contact:
+    name: Yabadu Support
+    email: support@yabadu.com
+
+tags:
+  - name: default
+  - name: Health
+    description: Health check endpoints
+  - name: Authentication
+    description: OAuth 2.0 authentication endpoints
+  - name: Identity
+    description: User profile and preferences management
+  - name: Applications
+    description: Private label application management
+  - name: Nutrition
+    description: Nutrition Product related endpoints
+  - name: Nutrition Plans
+    description: Nutrition plan creation and management
+  - name: Athletic Events
+    description: Athletic event management
+  - name: System
+    description: System reference data
+  - name: Target Generation
+    description: Public nutrition target generation endpoints
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: https://api.yabadu.com
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health/ping:
+    get:
+      tags:
+        - default
+      summary: Health check
+      description: Simple health check endpoint
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: pong
+  /:
+    get:
+      summary: API root
+      tags:
+        - default
+      description: Master directory endpoint with available resources
+      security: []
+      responses:
+        "200":
+          description: API directory
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                $ref: "#/components/schemas/DirectoryResponse"
+  /rels:
+    get:
+      summary: List link relationships
+      description: Get all available link relationships for HATEOAS navigation
+      security: []
+      responses:
+        "200":
+          description: Link relationships list
+          headers:
+            X-Pagination-Page:
+              $ref: "#/components/headers/X-Pagination-Page"
+            X-Pagination-PerPage:
+              $ref: "#/components/headers/X-Pagination-PerPage"
+            X-Pagination-Total:
+              $ref: "#/components/headers/X-Pagination-Total"
+            X-Pagination-MaximumPerPage:
+              $ref: "#/components/headers/X-Pagination-MaximumPerPage"
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LinkRelationship"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+  /rels/{id}:
+    get:
+      tags:
+        - default
+      summary: Get link relationship
+      description: Get a specific link relationship by ID
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Link relationship details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/LinkRelationship"
+  /private-label-applications:
+    get:
+      tags:
+        - Applications
+      summary: List applications
+      description: List private label applications accessible to the user
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PerPageParam"
+      responses:
+        "200":
+          description: Applications list
+          headers:
+            X-Pagination-Page:
+              $ref: "#/components/headers/X-Pagination-Page"
+            X-Pagination-PerPage:
+              $ref: "#/components/headers/X-Pagination-PerPage"
+            X-Pagination-Total:
+              $ref: "#/components/headers/X-Pagination-Total"
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PrivateLabelApplication"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /private-label-applications/{id}:
+    get:
+      tags:
+        - Applications
+      summary: Get application
+      description: Get details of a specific private label application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Application details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PrivateLabelApplication"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /primary-private-label-application:
+    get:
+      tags:
+        - Applications
+      summary: Get primary application
+      description: Get the user's primary private label application
+      responses:
+        "200":
+          description: Primary application
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PrivateLabelApplication"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /private-label-applications/{app_id}/authorization/oauth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Create access token
+      description: |
+        MISSING REFRESH TOKEN FLOW
+        Create an access token using OAuth 2.0 grant types:
+        - `authorization_code`: Exchange authorization code for token
+        - `refresh_token`: Refresh an existing token
+        - `password`: Direct username/password authentication
+      security: []
+      parameters:
+        - name: app_id
+          example: yabadu
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/PasswordTokenRequest"
+      responses:
+        "200":
+          description: Access token created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /public/target-generation/calculate:
+    post:
+      tags:
+        - Target Generation
+      summary: Calculate nutrition targets
+      description: |
+        Generate personalized nutrition targets (hydration and carbohydrate) based on athlete profile,
+        event details, and environmental conditions. This endpoint does not require authentication.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.yabaduplatform+json:
+            schema:
+              $ref: "#/components/schemas/TargetGenerationRequest"
+            example:
+              target_generation:
+                athlete_level_type_id: 1
+                event_type_id: 1
+                goal_record_id: 1
+                duration_hours_value: 2
+                duration_minutes_value: 30
+                distance_unit_type_id: 49
+                distance: 21.1
+                weight: 70
+                mass_unit_type_id: 30
+                sweat_rate_type_id: 2
+                temperature: 20
+                temperature_unit_type_id: 43
+      responses:
+        "200":
+          description: Nutrition targets calculated successfully
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                $ref: "#/components/schemas/TargetGenerationResponse"
+        "400":
+          description: Bad request - validation errors
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    data:
+                      status: 400
+                      message: "Invalid parameters: Missing required fields: distance, weight, mass_unit_type_id, sweat_rate_type_id, temperature, temperature_unit_type_id"
+                      errors: []
+                invalid_json:
+                  summary: Invalid JSON format
+                  value:
+                    data:
+                      status: 400
+                      message: 'Invalid JSON: unexpected token at ''{"invalid": json}'''
+                      errors: []
+                missing_wrapper:
+                  summary: Missing target_generation wrapper
+                  value:
+                    data:
+                      status: 400
+                      message: "Missing required parameter: target_generation"
+                      errors: []
+  /system/units:
+    get:
+      tags:
+        - System
+      summary: List units
+      description: List all units of measurement
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PerPageParam"
+      responses:
+        "200":
+          description: Units list
+          headers:
+            X-Pagination-Page:
+              $ref: "#/components/headers/X-Pagination-Page"
+            X-Pagination-PerPage:
+              $ref: "#/components/headers/X-Pagination-PerPage"
+            X-Pagination-Total:
+              $ref: "#/components/headers/X-Pagination-Total"
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Unit"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+  /system/units/{id}:
+    get:
+      tags:
+        - System
+      summary: Get unit
+      description: Get details of a specific unit
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unit details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Unit"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /system/genders:
+    get:
+      tags:
+        - System
+      summary: List genders
+      description: List all gender options
+      security: []
+      responses:
+        "200":
+          description: Genders list
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Gender"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+  /system/genders/{id}:
+    get:
+      tags:
+        - System
+      summary: Get gender
+      description: Get details of a specific gender
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gender details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Gender"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /system/athlete-levels:
+    get:
+      summary: "[ONBOARDING] - List athlete levels (novice, serious, age_group_competitive, professional)"
+      tags:
+        - System
+      description: List all athlete level categories
+      security: []
+      responses:
+        "200":
+          description: Athlete levels list
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AthleteLevel"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+  /system/athlete-levels/{id}:
+    get:
+      tags:
+        - System
+      summary: Get athlete level
+      description: Get details of a specific athlete level
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Athlete level details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AthleteLevel"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /system/timezones:
+    get:
+      tags:
+        - System
+      summary: List timezones
+      description: List all supported timezones
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PerPageParam"
+      responses:
+        "200":
+          description: Timezones list
+          headers:
+            X-Pagination-Page:
+              $ref: "#/components/headers/X-Pagination-Page"
+            X-Pagination-PerPage:
+              $ref: "#/components/headers/X-Pagination-PerPage"
+            X-Pagination-Total:
+              $ref: "#/components/headers/X-Pagination-Total"
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Timezone"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+  /system/timezones/{id}:
+    get:
+      tags:
+        - System
+      summary: Get timezone
+      description: Get details of a specific timezone
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Timezone details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Timezone"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /system/countries:
+    get:
+      tags:
+        - System
+      summary: List countries
+      description: List all countries
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PerPageParam"
+      responses:
+        "200":
+          description: Countries list
+          headers:
+            X-Pagination-Page:
+              $ref: "#/components/headers/X-Pagination-Page"
+            X-Pagination-PerPage:
+              $ref: "#/components/headers/X-Pagination-PerPage"
+            X-Pagination-Total:
+              $ref: "#/components/headers/X-Pagination-Total"
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Country"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+  /system/athletic-event-types:
+    get:
+      tags:
+        - System
+      summary: List athletic event types
+      description: List all athletic event types
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PerPageParam"
+      responses:
+        "200":
+          description: Athletic event types list
+          headers:
+            X-Pagination-Page:
+              $ref: "#/components/headers/X-Pagination-Page"
+            X-Pagination-PerPage:
+              $ref: "#/components/headers/X-Pagination-PerPage"
+            X-Pagination-Total:
+              $ref: "#/components/headers/X-Pagination-Total"
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AthleticEventType"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+  /system/athletic-event-types/{id}:
+    get:
+      tags:
+        - System
+      summary: Get athletic event type
+      description: Get details of a specific athletic event type
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Athletic event type details
+          content:
+            application/vnd.yabaduplatform+json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AthleticEventType"
+                  links:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Link"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /private-label-applications/{app_id}/registration/registrations:
+    post:
+      tags:
+        - Authentication
+      summary: Create user registration
+      description: |
+        Register a new user for the specified private label application.
+        
+        After successful registration, a verification email will be sent to the provided 
+        email address with a link to verify the account. The user must verify their 
+        email address before they can log in.
+      security: []
+      parameters:
+        - name: app_id
+          example: yabadu
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Private label application identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationRequest"
+            example:
+              email_address_value: "user@example.com"
+              password: "Password123!"
+              password_confirmation: "Password123!"
+              name: "John Doe"
+              privacy_policy_accepted: true
+              newsletter_signup: false
+      responses:
+        "201":
+          description: Registration created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          description: Validation errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Link:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Human-readable link title
+        href:
+          type: string
+          format: uri
+          description: Link URL
+        rel:
+          type: string
+          description: Link relationship type
+        templated:
+          type: boolean
+          default: false
+          description: Whether the href is a URI template
+      required:
+        - href
+        - rel
+    LinkRelationship:
+      type: object
+      properties:
+        rel:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    DirectoryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            title:
+              type: string
+            version:
+              nullable: true
+              type: string
+            description:
+              type: string
+            links:
+              type: array
+              items:
+                $ref: "#/components/schemas/Link"
+    Pagination:
+      properties:
+        page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Number of items per page
+        total:
+          type: integer
+          description: Total number of items
+        maximum_per_page:
+          type: integer
+          description: Maximum allowed items per page
+    PrivateLabelApplication:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    PasswordTokenRequest:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          enum: [password]
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        scope:
+          type: string
+      required:
+        - grant_type
+        - client_id
+        - client_secret
+        - username
+        - password
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Token lifetime in seconds
+        refresh_token:
+          type: string
+        scope:
+          type: string
+      required:
+        - access_token
+        - token_type
+    ErrorResponse:
+      type: object
+      properties:
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+        data:
+          type: object
+          properties:
+            status:
+              type: integer
+              description: HTTP status code
+            message:
+              type: string
+              description: Error message
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    description: Field name
+                  message:
+                    type: string
+                    description: Error message
+      required:
+        - data
+    TargetGenerationRequest:
+      type: object
+      properties:
+        target_generation:
+          type: object
+          properties:
+            athlete_level_type_id:
+              type: integer
+              description: SystemAthleteLevel ID (1=Recreational, 2=Competitive, 3=Elite, 4=Professional)
+              example: 1
+            event_type_id:
+              type: integer
+              description: SystemAthleticEventType ID (1=Running, 2=Cycling, 3=Triathlon)
+              example: 1
+            goal_record_id:
+              type: integer
+              description: SystemAthleticEventGoal ID (1=Performance)
+              example: 1
+            duration_hours_value:
+              type: integer
+              description: Event duration hours (0-48)
+              minimum: 0
+              maximum: 48
+              example: 2
+            duration_minutes_value:
+              type: integer
+              description: Event duration minutes (0-59)
+              minimum: 0
+              maximum: 59
+              example: 30
+            distance_unit_type_id:
+              type: integer
+              description: SystemUnit ID for distance unit (49=kilometers)
+              example: 49
+            distance:
+              type: number
+              format: float
+              description: Event distance value
+              minimum: 0.1
+              maximum: 1000
+              example: 21.1
+            weight:
+              type: number
+              format: float
+              description: Athlete body weight
+              minimum: 1
+              maximum: 400
+              example: 70
+            mass_unit_type_id:
+              type: integer
+              description: SystemUnit ID for mass unit (30=kilograms)
+              example: 30
+            sweat_rate_type_id:
+              type: integer
+              description: SystemSweatRateCategory ID (1=Low, 2=Average, 3=High)
+              example: 2
+            temperature:
+              type: number
+              format: float
+              description: Expected temperature
+              minimum: -20
+              maximum: 50
+              example: 20
+            temperature_unit_type_id:
+              type: integer
+              description: SystemUnit ID for temperature unit (43=Celsius)
+              example: 43
+          required:
+            - athlete_level_type_id
+            - event_type_id
+            - goal_record_id
+            - duration_hours_value
+            - duration_minutes_value
+            - distance_unit_type_id
+            - distance
+            - weight
+            - mass_unit_type_id
+            - sweat_rate_type_id
+            - temperature
+            - temperature_unit_type_id
+      required:
+        - target_generation
+    TargetGenerationResponse:
+      type: object
+      properties:
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+        data:
+          type: object
+          properties:
+            target_generation_results:
+              type: object
+              properties:
+                nutrition_targeting:
+                  type: object
+                  properties:
+                    hydration:
+                      type: object
+                      properties:
+                        hourly_targets:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              start_time:
+                                type: integer
+                                description: Start time in seconds
+                              end_time:
+                                type: integer
+                                description: End time in seconds
+                              hydration_target:
+                                type: number
+                                format: float
+                                description: Hydration target in ml
+                              hydration_target_upper_limit:
+                                type: number
+                                format: float
+                                description: Upper limit for hydration in ml
+                        overall_target:
+                          type: number
+                          format: float
+                          description: Total hydration target in ml
+                        overall_levels:
+                          type: array
+                          items:
+                            type: number
+                            format: float
+                          description: 8 hydration levels for scoring
+                        hourly_levels:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              time_block:
+                                type: integer
+                              hydration_target:
+                                type: number
+                                format: float
+                              hydration_levels:
+                                type: array
+                                items:
+                                  type: number
+                                  format: float
+                    carbohydrate:
+                      type: object
+                      properties:
+                        hourly_targets:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              start_time:
+                                type: integer
+                                description: Start time in seconds
+                              end_time:
+                                type: integer
+                                description: End time in seconds
+                              carbohydrate_target:
+                                type: number
+                                format: float
+                                description: Carbohydrate target in grams
+                              carbohydrate_target_upper_limit:
+                                type: number
+                                format: float
+                                description: Upper limit for carbohydrates in grams
+                        overall_target:
+                          type: number
+                          format: float
+                          description: Total carbohydrate target in grams
+                        overall_levels:
+                          type: array
+                          items:
+                            type: number
+                            format: float
+                          description: 7 carbohydrate levels for scoring
+                    metadata:
+                      type: object
+                      properties:
+                        calculation_id:
+                          type: string
+                          format: uuid
+                          description: Unique identifier for this calculation
+                        calculated_at:
+                          type: string
+                          format: date-time
+                          description: Timestamp of calculation
+                        minimum_hydration_enforced:
+                          type: boolean
+                          description: Whether minimum hydration was enforced
+                        body_weight_kg:
+                          type: number
+                          format: float
+                          description: Converted body weight in kg
+                        sweat_rate_ml_hr:
+                          type: number
+                          format: float
+                          description: Calculated sweat rate in ml/hr
+                        target_loss_percentage:
+                          type: number
+                          format: float
+                          description: Target body weight loss percentage
+    Unit:
+      type: object
+      properties:
+        id:
+          type: integer
+        unit_family_id:
+          type: integer
+        name:
+          type: string
+        unit_name:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    Gender:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    AthleteLevel:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    Timezone:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    Country:
+      type: object
+      properties:
+        id:
+          type: integer
+        currency_id:
+          type: integer
+        name:
+          type: string
+        alpha2:
+          type: string
+        alpha3:
+          type: string
+        region:
+          type: string
+        subregion:
+          type: string
+        country_code:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    AthleticEventType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+    RegistrationRequest:
+      type: object
+      properties:
+        email_address_value:
+          type: string
+          format: email
+          description: Email address for registration
+        password:
+          type: string
+          description: Password (must contain uppercase, lowercase, number, and special character)
+        password_confirmation:
+          type: string
+          description: Password confirmation (must match password)
+        name:
+          type: string
+          description: Full name (will be split into given_name and family_name)
+        privacy_policy_accepted:
+          type: boolean
+          description: Must be true to accept privacy policy
+        newsletter_signup:
+          type: boolean
+          description: Optional newsletter signup
+        client_id:
+          type: string
+          description: OAuth client ID (optional)
+        client_secret:
+          type: string
+          description: OAuth client secret (optional)
+      required:
+        - email_address_value
+        - password
+        - password_confirmation
+        - privacy_policy_accepted
+    RegistrationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: User ID
+        email_address:
+          type: string
+          format: email
+          description: Registered email address
+      required:
+        - id
+        - email_address
+
+  headers:
+    X-Pagination-Page:
+      description: Current page number
+      schema:
+        type: integer
+
+    X-Pagination-PerPage:
+      description: Items per page
+      schema:
+        type: integer
+
+    X-Pagination-Total:
+      description: Total number of items
+      schema:
+        type: integer
+
+    X-Pagination-MaximumPerPage:
+      description: Maximum allowed items per page
+      schema:
+        type: integer
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPageParam:
+      name: per_page
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 250
+        default: 25
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/vnd.yabaduplatform+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Unauthorized
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+            example: 'Bearer realm="api"'
+      content:
+        application/vnd.yabaduplatform+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/vnd.yabaduplatform+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/vnd.yabaduplatform+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Conflict (validation errors)
+      content:
+        application/vnd.yabaduplatform+json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
